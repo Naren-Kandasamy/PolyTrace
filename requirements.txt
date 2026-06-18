@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pymupdf
+pdfplumber
+sentence-transformers
+faiss-cpu
+transformers
+torch
+matplotlib
+plotly
+pandas
+requests
+langdetect
+tabulate
