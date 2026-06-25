@@ -47,8 +47,17 @@ def extract_images_from_pdf(pdf_path: str, paper_id: str) -> list:
             image_bytes = base_image["image"]
             image_ext = base_image["ext"]
             
-            # Heuristic: ignore small images (logos, icons) which are usually < 400px
-            if base_image["width"] < 400 or base_image["height"] < 400:
+            width = base_image["width"]
+            height = base_image["height"]
+            
+            # Stricter heuristic for scientific plots:
+            # 1. Plots are usually large (at least 500x500 pixels minimum)
+            if width < 500 or height < 500:
+                continue
+                
+            # 2. Plots are rarely extremely skewed strips (like equations or banners)
+            aspect_ratio = width / height
+            if aspect_ratio < 0.4 or aspect_ratio > 3.0:
                 continue
                 
             image_filename = f"paper_{paper_id}_page{page_num}_img{img_index}.{image_ext}"

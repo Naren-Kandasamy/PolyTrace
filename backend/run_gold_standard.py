@@ -1,12 +1,13 @@
 import os
 import sys
+import time
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-from pipeline.extract import run_extraction_pipeline
+from pipeline.extract import prepare_paper_data, run_text_extraction, run_vision_extraction
 
 DB_NAME = os.getenv("DB_NAME", "materials_ai")
 DB_USER = os.getenv("DB_USER", "ncl")
@@ -26,6 +27,7 @@ def setup_database():
     return conn
 
 def main():
+    start_total_time = time.time()
     print("=== NCL PolyTrace (Hydrogen Storage) - Gold Standard Run ===")
     conn = setup_database()
     
@@ -38,11 +40,13 @@ def main():
     pdf_files = [f for f in os.listdir(gold_dir) if f.endswith(".pdf")]
     print(f"[*] Found {len(pdf_files)} PDFs in Gold Standard directory.")
     
-    # Process each PDF
+    parsed_data = []
+    
+    # PHASE 1: CPU Parsing
+    print("\n--- PHASE 1: CPU Parsing (Text, Tables, Images) ---")
     for i, pdf_file in enumerate(pdf_files):
         pdf_path = os.path.join(gold_dir, pdf_file)
         
-        # 1. Insert dummy paper record to satisfy foreign key constraints
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO papers (title, pdf_path, is_open_access) 
@@ -52,10 +56,22 @@ def main():
             paper_id = cur.fetchone()[0]
             conn.commit()
             
-        # 2. Run pipeline
-        run_extraction_pipeline(paper_id, pdf_path, conn)
+        core_text, image_paths = prepare_paper_data(paper_id, pdf_path)
+        parsed_data.append((paper_id, core_text, image_paths))
+        
+    # PHASE 2: LLM Text Extraction
+    print("\n--- PHASE 2: Text Extraction (llama3.2:1b) ---")
+    for paper_id, core_text, _ in parsed_data:
+        run_text_extraction(paper_id, core_text, conn)
 
-    print("\n[+] Gold Standard batch processing complete!")
+    # PHASE 3: VLM Image Extraction
+    print("\n--- PHASE 3: Vision Extraction (qwen2.5vl:3b) ---")
+    for paper_id, _, image_paths in parsed_data:
+        run_vision_extraction(paper_id, image_paths, conn)
+
+    end_total_time = time.time()
+    total_minutes = (end_total_time - start_total_time) / 60.0
+    print(f"\n[+] Gold Standard batch processing complete! (Total Pipeline Time: {total_minutes:.2f} minutes)")
     conn.close()
 
 if __name__ == "__main__":

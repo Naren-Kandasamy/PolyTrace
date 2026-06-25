@@ -14,10 +14,14 @@ class TemperatureRange(BaseModel):
 
 class MaterialProperties(BaseModel):
     material_name: Optional[str] = "Unknown"
+    paper_aim: Optional[str] = None
+    paper_motive: Optional[str] = None
+    paper_type: Optional[str] = "UNKNOWN"
     base_alloy: Optional[str] = None
     substitutions: Optional[List[str]] = []
     absorption_temperature_c: Optional[TemperatureRange] = None
     desorption_temperature_c: Optional[TemperatureRange] = None
+    enthalpy_of_formation_kj_mol: Optional[float] = None
     
     # Hydrogen storage capacity rarely exceeds 20 wt% (even theoretically for MgH2 it's ~7.6%)
     # If the LLM hallucinates 50%, we want to catch it.
